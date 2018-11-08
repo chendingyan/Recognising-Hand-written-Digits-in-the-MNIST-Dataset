@@ -10,7 +10,7 @@ function ReturnVal = SolveMNIST_Gradient(tol, num_iter, step_size, ...
 %         lambda:    Regularisation parameter
 %         search_strategy: 0 for constant value
 %                          1 for golden section method
-
+%% Deal with nargins
 if nargin < 5
     search_strategy = 0;
 end
@@ -126,15 +126,19 @@ end
 % xlabel('Iterations');
 % ylabel('Function value');
 % title('Gradient Descent using constant step size and line search method');
-%%
+
+%%Calculate time for analyze
 total_iteration = i +1;
 total_time = toc;
 
 fprintf('Total itertaion = %d\n', total_iteration);
 fprintf('Total time = %d\n', total_time);
-
-save('function_value_iteration_iteration=5000_goldensection', 'fcn_val_iter');
-
+if(search_strategy == 0)
+    save(strcat('function_value_iteration_constant_iteration_', num2str(num_iter)), 'fcn_val_iter');
+    
+elseif(search_strategy == 1)
+    save(strcat('function_value_iteration_goldensection_iteration_', num2str(num_iter)), 'fcn_val_iter');
+end
 
 ReturnVal = beta_guess;
 
@@ -174,6 +178,9 @@ function min = golden_section_search(f, a0, b0)
     min = a1;
 end
 
+%also apply secant newton, but I didn't apply it in the main code.
+%To use it, you should use @ function handle to obtain gradient and f both
+%to import it to function.
 function min = secant(f, x0, x1, grad)
     tolerance = 0.0001;
     max_Iteration = 100;
