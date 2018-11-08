@@ -1,0 +1,193 @@
+function ReturnVal = SolveMNIST_Gradient(tol, num_iter, step_size, ...
+                                         lambda, search_strategy)
+% Build a classifier for recognising hand-written digits from images
+%
+% Ruth Misener, 01 Feb 2016
+%
+% INPUTS: tol:       Optimality tolerance; check if algorithm converged
+%         num_iter:  Maximum number of iterations
+%         step_size: Step size
+%         lambda:    Regularisation parameter
+%         search_strategy: 0 for constant value
+%                          1 for golden section method
+
+if nargin < 5
+    search_strategy = 0;
+end
+
+%% Initialise the training set --------------------------------------------
+load mnist.mat
+n   = 1000; % Input features
+m   = 1000; % Test cases
+dim =   10;
+tic;
+%% l-2 Regulariser
+norm_type = 2;
+
+%% Initialise a starting point for the algorithm --------------------------
+convgsd              = zeros(num_iter, 1);
+lenXsd               = zeros(num_iter, 1);
+diffFsd              = zeros(num_iter, 1);
+step_size_iter       = zeros(num_iter, 1);
+
+beta_guess = zeros(1,n*dim);
+
+beta_eval  = evaluate_gB(beta_guess, X, y, n, m, dim, lambda, ...
+                         0, norm_type);
+beta_grad  = evaluate_gB(beta_guess, X, y, n, m, dim, lambda, ...
+                         1, norm_type);
+
+%% Store beta guesses at each iteration
+beta_guess_iter(1,:) = beta_guess; 
+
+%% Store the function value at each iteration
+fcn_val_iter = zeros(num_iter, 1);
+fcn_val_iter(1)      = beta_eval;  
+
+fprintf('\niter=%d; Func Val=%f; FONC Residual=%f',...
+        0, beta_eval, norm(beta_grad));
+
+%% Iterative algorithm begins ---------------------------------------------
+for i = 1:num_iter                        
+    
+    % Step for gradient descent ------------------------------------------
+    % *** Insert gradient descent code here ***
+    % ***                                   ***
+    if search_strategy == 1
+        % use @ function handles
+        evaluate_function = @(each_step_size) evaluate_gB(beta_guess_iter(i,:)-each_step_size.* beta_grad, ... 
+        X, y, n, m, dim, lambda, 0, norm_type);
+        step_size = golden_section_search(evaluate_function, 1e-6, 1e-2);
+        fprintf('\n Golden_Section:step size = %f', step_size);
+    end
+    %%if search_strategy is not 1, it is constant step_size
+    step_size_iter(i) = step_size;
+    
+    beta_guess(1, :) = beta_guess_iter(i, :) - step_size.*beta_grad;
+    % Update with the new iteration --------------------------------------
+    beta_guess_iter(i+1,:) = beta_guess;
+    
+    beta_eval              = evaluate_gB(beta_guess, X, y, n, m, dim, ...
+                                         lambda, 0, norm_type);
+                                     
+    fcn_val_iter(i+1)      = beta_eval;
+    
+    beta_grad              = evaluate_gB(beta_guess, X, y, n, m, dim, ...
+                                         lambda, 1, norm_type);
+                         
+    % Check if it's time to terminate ------------------------------------
+
+    % Check the FONC?
+    % Store the norm of the gradient at each iteration
+    convgsd(i) = norm(beta_grad); % <-- Correct this!!
+    
+    % Check that the vector is changing from iteration to iteration?
+    % Stores length of the difference between the current beta and the 
+    % previous one at each iteration
+    diff = beta_guess - beta_guess_iter(i);
+    lenXsd(i)  = norm(diff);
+    
+    % Check that the objective is changing from iteration to iteration?
+    % Stores the absolute value of the difference between the current 
+    % function value and the previous one at each iteration
+    diffFsd(i) = abs(beta_eval - fcn_val_iter(i));
+
+    
+    fprintf('\niter=%d; Func Val=%f; FONC Residual=%f; Sqr Diff=%f',...
+            i, beta_eval, convgsd(i), lenXsd(i));
+    
+    % Check the convergence criteria?
+    if (convgsd(i) <= tol)
+        fprintf('\nFirst-Order Optimality Condition met\n');
+        break; 
+    elseif (lenXsd(i) <= tol)
+        fprintf('\nExit: Design not changing\n');
+        break;
+    elseif (diffFsd(i) <= tol)
+        fprintf('\nExit: Objective not changing\n');
+        break;
+    elseif (i + 1 >= num_iter)
+        fprintf('\nExit: Done iterating\n');
+        break;
+    end
+    
+end
+
+% plot(1:num_iter, fcn_val_iter);
+% xlabel('Iterations');
+% ylabel('Function value');
+% title('Gradient Descent');
+%%
+%load('function_value_iteration_iteration=5000_goldensection.mat')
+%plot(1:1505, fcn_val_iter(1:1505));
+%hold on;
+%load('function_value_iteration.mat');
+%plot(1:7084, fcn_val_iter(1:7084));
+% xlabel('Iterations');
+% ylabel('Function value');
+% title('Gradient Descent using constant step size and line search method');
+%%
+total_iteration = i +1;
+total_time = toc;
+
+fprintf('Total itertaion = %d\n', total_iteration);
+fprintf('Total time = %d\n', total_time);
+
+save('function_value_iteration_iteration=5000_goldensection', 'fcn_val_iter');
+
+
+ReturnVal = beta_guess;
+
+end
+
+function min = golden_section_search(f, a0, b0)
+    tolerance = 0.001;
+    rho = 0.382;
+    max_Iteration = 100;
+    current_Iteration = 0;
+    a1 = a0 + rho * (b0 - a0);
+    b1 = b0 - rho * (b0 - a0);
+    f1 = f(a1);
+    f2 = f(b1);
+    while current_Iteration < max_Iteration
+        fprintf('\n a1 = %.6f b1 = %.6f f(a) = %.6f f(b) = %.6f', ...
+            a1, b1, f1, f2);
+        if abs(f1 - f2) < tolerance
+            fprintf('The difference value has reach the tolerance');
+            break;
+        end
+        if f1 > f2
+            a0 = a1; % update the boundary
+            a1 = b1; % set new a1
+            b1 = b0 - rho * (b0 - a0); % find new b1 between [b1, b0] but update 
+            f1 = f2; % also update the value, f(a2) = f(b1)
+            f2 = f(b1);
+        else
+            b0 = b1;
+            b1 = a1;
+            a1 = a0 + rho * (b0 - a0);
+            f2 = f1;
+            f1 = f(a1);
+        end
+        current_Iteration = current_Iteration + 1;
+    end
+    min = a1;
+end
+
+function min = secant(f, x0, x1, grad)
+    tolerance = 0.0001;
+    max_Iteration = 100;
+    current_Iteration = 0;
+    while current_Iteration < max_Iteration
+        g0 = grad(x0);
+        g1 = grad(x1);
+        x2 = x0 - g0 *(x0 - x1) / (g0 - g1);
+        x0 = x1;
+        x1 = x2;
+        if abs(f(x0) - f(x1)) < tolerance
+            break;
+        end
+        current_Iteration = current_Iteration + 1;
+    end
+    min = x0;
+end
